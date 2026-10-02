@@ -1,0 +1,38 @@
+name: Laravel checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: cmf_test
+          POSTGRES_USER: cmf
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: --health-cmd "pg_isready -U cmf -d cmf_test" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: intl, mbstring, pdo_pgsql, pdo_sqlite, zip, gd, bcmath
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist
+      - run: cp .env.example .env && php artisan key:generate
+      - run: vendor/bin/pint --test
+      - run: php artisan test
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: cmf_test
+          DB_USERNAME: cmf
+          DB_PASSWORD: ci-only-password
+      - run: composer audit
